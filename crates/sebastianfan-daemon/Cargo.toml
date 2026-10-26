@@ -10,6 +10,7 @@ authors.workspace = true
 [dependencies]
 sebastianfan-core.workspace = true
 signal-hook.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true

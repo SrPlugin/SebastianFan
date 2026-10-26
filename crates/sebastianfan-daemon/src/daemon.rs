@@ -2,6 +2,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use tracing::info;
+
 use sebastianfan_core::{Config, Governor, HardwareError, Profile, ProfileControl, SensorSource};
 
 const SHUTDOWN_POLL: Duration = Duration::from_millis(100);
@@ -38,6 +40,7 @@ impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
         let profile = self.governor.update(temperature);
         if self.applied != Some(profile) {
             self.control.set(profile)?;
+            info!(%temperature, %profile, "profile changed");
             self.applied = Some(profile);
         }
         Ok(profile)
@@ -46,8 +49,10 @@ impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
     pub fn run(&mut self, shutdown: &AtomicBool) -> Result<(), HardwareError> {
         self.ensure_profiles_supported()?;
         let original = self.control.current()?;
+        info!(profile = %original, "daemon started");
         let outcome = self.run_until(shutdown);
         let restored = self.control.set(original);
+        info!(profile = %original, "restored original profile");
         outcome.and(restored)
     }
 
