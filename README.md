@@ -16,6 +16,7 @@ It ships as a git-style CLI and a systemd daemon.
 
 - Inspect thermal zones, fan speeds and the active profile
 - Set each fan to a fixed percentage, or back to automatic control
+- Turn the 80 percent battery charge limit on or off
 - Temperature curve with hysteresis and a hold time, so profiles do not flap
 - Foreground or systemd-managed daemon that restores your original profile on exit
 - Strict, validated TOML configuration
@@ -62,6 +63,8 @@ sebastianfan fan set <cpu|gpu|all> <auto|20-100>
 sebastianfan profile list
 sebastianfan profile get
 sebastianfan profile set <name>
+sebastianfan battery status
+sebastianfan battery limit <on|off>
 sebastianfan curve show
 sebastianfan curve validate <file>
 sebastianfan config path
@@ -98,6 +101,13 @@ cpu auto, gpu auto
 $ sebastianfan fan get
 cpu  60%   5061 rpm
 gpu  auto  4780 rpm
+
+$ sebastianfan battery status
+battery       87% (Charging)
+charge limit  on (80%)
+
+$ sudo sebastianfan battery limit off
+charge limit off
 
 $ sebastianfan sensor list
 thermal_zone0  acpitz           42.0 °C
@@ -185,6 +195,11 @@ place until you set `auto` again or reboot.
 The stock `acer-wmi` driver of Linux 6.17 only reads fan speeds. Calling the
 firmware's WMI fan methods directly is rejected on the Acer Nitro ANV15-51, so
 the kernel driver is required.
+
+## Battery
+
+`battery limit on` stops charging at 80 percent to extend the battery lifetime.
+It writes `1` or `0` to the `battery_limiter` attribute of `linuwu_sense`.
 
 ## Limitations
 
