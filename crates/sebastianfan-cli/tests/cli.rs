@@ -495,3 +495,49 @@ fn daemon_run_fails_when_the_configured_sensor_does_not_exist() {
         .failure()
         .stderr(predicate::str::contains("not found"));
 }
+
+fn unit_file(root: &TempDir) -> std::path::PathBuf {
+    root.path().join("etc/systemd/system/sebastianfan.service")
+}
+
+#[test]
+fn daemon_install_writes_the_unit_with_the_binary_and_config() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["--config", "/etc/custom/fan.toml", "daemon", "install"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("installed "));
+    let unit = fs::read_to_string(unit_file(&root)).unwrap();
+    let expected = format!(
+        "ExecStart={} --config /etc/custom/fan.toml daemon run",
+        env!("CARGO_BIN_EXE_sebastianfan")
+    );
+    assert!(unit.contains(&expected), "{unit}");
+    assert!(!unit.contains('@'));
+}
+
+#[test]
+fn daemon_uninstall_removes_the_unit() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["daemon", "install"])
+        .assert()
+        .success();
+    sebastianfan(&root)
+        .args(["daemon", "uninstall"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("removed "));
+    assert!(!unit_file(&root).exists());
+}
+
+#[test]
+fn daemon_uninstall_is_idempotent() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["daemon", "uninstall"])
+        .assert()
+        .success()
+        .stdout(predicate::str::ends_with("is not installed\n"));
+}

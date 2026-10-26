@@ -24,6 +24,14 @@ impl Paths {
         self.under(PLATFORM_PROFILE_DIR)
     }
 
+    pub fn systemd_units(&self) -> PathBuf {
+        self.under("/etc/systemd/system")
+    }
+
+    pub fn is_system(&self) -> bool {
+        self.root == Path::new("/")
+    }
+
     fn under(&self, absolute: &str) -> PathBuf {
         self.root.join(absolute.trim_start_matches('/'))
     }
@@ -44,6 +52,11 @@ mod tests {
         assert_eq!(Paths::default().thermal(), Path::new("/sys/class/thermal"));
         assert_eq!(Paths::default().hwmon(), Path::new("/sys/class/hwmon"));
         assert_eq!(
+            Paths::default().systemd_units(),
+            Path::new("/etc/systemd/system")
+        );
+        assert!(Paths::default().is_system());
+        assert_eq!(
             Paths::default().platform_profile(),
             Path::new("/sys/firmware/acpi")
         );
@@ -54,6 +67,11 @@ mod tests {
         let paths = Paths::new(PathBuf::from("/tmp/fake"));
         assert_eq!(paths.thermal(), Path::new("/tmp/fake/sys/class/thermal"));
         assert_eq!(paths.hwmon(), Path::new("/tmp/fake/sys/class/hwmon"));
+        assert_eq!(
+            paths.systemd_units(),
+            Path::new("/tmp/fake/etc/systemd/system")
+        );
+        assert!(!paths.is_system());
         assert_eq!(
             paths.platform_profile(),
             Path::new("/tmp/fake/sys/firmware/acpi")

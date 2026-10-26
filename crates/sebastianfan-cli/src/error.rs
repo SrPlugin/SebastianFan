@@ -1,5 +1,6 @@
 use std::io;
 use std::path::PathBuf;
+use std::process::ExitStatus;
 
 use sebastianfan_core::{ConfigError, HardwareError};
 use thiserror::Error;
@@ -18,6 +19,8 @@ pub enum CliError {
     },
     #[error("cannot install signal handlers: {0}")]
     Signals(#[source] io::Error),
+    #[error("systemctl {command} failed ({status})")]
+    Systemctl { command: String, status: ExitStatus },
     #[error("{} already exists, use --force to overwrite it", .0.display())]
     AlreadyExists(PathBuf),
     #[error("{}: {source}", .path.display())]

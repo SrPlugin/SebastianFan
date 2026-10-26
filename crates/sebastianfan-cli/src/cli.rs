@@ -126,4 +126,8 @@ pub enum ConfigCommand {
 pub enum DaemonCommand {
     #[command(about = "Run the control loop in the foreground")]
     Run,
+    #[command(about = "Install and start the systemd service")]
+    Install,
+    #[command(about = "Stop and remove the systemd service")]
+    Uninstall,
 }

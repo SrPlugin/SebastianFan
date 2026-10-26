@@ -4,6 +4,7 @@ mod daemon;
 mod fan;
 mod profile;
 mod sensor;
+mod service;
 mod status;
 
 use crate::cli::{
@@ -26,6 +27,8 @@ pub fn run(cli: &Cli) -> Result<String, CliError> {
         Command::Daemon(DaemonCommand::Run) => {
             daemon::run(&paths, &store::load(&cli.config)?, cli.log_level)
         }
+        Command::Daemon(DaemonCommand::Install) => service::install(&paths, &cli.config),
+        Command::Daemon(DaemonCommand::Uninstall) => service::uninstall(&paths),
         Command::Curve(CurveCommand::Show) => Ok(curve::show(&store::load(&cli.config)?)),
         Command::Curve(CurveCommand::Validate { file }) => curve::validate(file),
         Command::Profile(ProfileCommand::List) => profile::list(&paths),
