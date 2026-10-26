@@ -20,6 +20,19 @@ fn fake_root() -> TempDir {
     let root = tempfile::tempdir().unwrap();
     write(
         root.path(),
+        "sys/devices/platform/acer-wmi/nitro_sense/battery_limiter",
+        "1\n",
+    );
+    write(root.path(), "sys/class/power_supply/ACAD/type", "Mains\n");
+    write(root.path(), "sys/class/power_supply/BAT1/type", "Battery\n");
+    write(root.path(), "sys/class/power_supply/BAT1/capacity", "87\n");
+    write(
+        root.path(),
+        "sys/class/power_supply/BAT1/status",
+        "Charging\n",
+    );
+    write(
+        root.path(),
         "sys/devices/platform/acer-wmi/nitro_sense/fan_speed",
         "0,0\n",
     );
@@ -627,6 +640,75 @@ fn fan_set_fails_when_the_driver_is_not_loaded() {
     let root = tempfile::tempdir().unwrap();
     sebastianfan(&root)
         .args(["fan", "set", "cpu", "50"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with("error: "));
+}
+
+fn limiter_file(root: &TempDir) -> std::path::PathBuf {
+    root.path()
+        .join("sys/devices/platform/acer-wmi/nitro_sense/battery_limiter")
+}
+
+#[test]
+fn battery_status_shows_level_state_and_limit() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["battery", "status"])
+        .assert()
+        .success()
+        .stdout("battery       87% (Charging)\ncharge limit  on (80%)\n");
+}
+
+#[test]
+fn battery_status_degrades_gracefully_without_hardware_support() {
+    let root = tempfile::tempdir().unwrap();
+    sebastianfan(&root)
+        .args(["battery", "status"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("unavailable").count(2));
+}
+
+#[test]
+fn battery_limit_off_writes_zero() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["battery", "limit", "off"])
+        .assert()
+        .success()
+        .stdout("charge limit off\n");
+    assert_eq!(fs::read_to_string(limiter_file(&root)).unwrap(), "0");
+}
+
+#[test]
+fn battery_limit_on_writes_one() {
+    let root = fake_root();
+    fs::write(limiter_file(&root), "0\n").unwrap();
+    sebastianfan(&root)
+        .args(["battery", "limit", "on"])
+        .assert()
+        .success()
+        .stdout("charge limit on (80%)\n");
+    assert_eq!(fs::read_to_string(limiter_file(&root)).unwrap(), "1");
+}
+
+#[test]
+fn battery_limit_rejects_other_values() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["battery", "limit", "80"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("use on or off"));
+    assert_eq!(fs::read_to_string(limiter_file(&root)).unwrap(), "1\n");
+}
+
+#[test]
+fn battery_limit_fails_when_the_driver_is_not_loaded() {
+    let root = tempfile::tempdir().unwrap();
+    sebastianfan(&root)
+        .args(["battery", "limit", "on"])
         .assert()
         .failure()
         .stderr(predicate::str::starts_with("error: "));

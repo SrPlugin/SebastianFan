@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{Parser, Subcommand, ValueEnum};
-use sebastianfan_core::{FanSpeed, FanTarget, Profile};
+use sebastianfan_core::{ChargeLimit, FanSpeed, FanTarget, Profile};
 use tracing::Level;
 
 pub const DEFAULT_CONFIG_PATH: &str = "/etc/sebastianfan/config.toml";
@@ -82,6 +82,8 @@ pub enum Command {
     Curve(CurveCommand),
     #[command(subcommand, about = "Show or create the configuration file")]
     Config(ConfigCommand),
+    #[command(subcommand, about = "Show the battery and control its charge limit")]
+    Battery(BatteryCommand),
     #[command(subcommand, about = "Run the background control loop")]
     Daemon(DaemonCommand),
 }
@@ -178,4 +180,19 @@ pub enum DaemonCommand {
     Install,
     #[command(about = "Stop and remove the systemd service")]
     Uninstall,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum BatteryCommand {
+    #[command(about = "Show the battery level, charging state and charge limit")]
+    Status,
+    #[command(about = "Turn the 80 percent charge limit on or off")]
+    Limit {
+        #[arg(
+            value_name = "STATE",
+            value_parser = |value: &str| value.parse::<ChargeLimit>(),
+            help = "on or off"
+        )]
+        state: ChargeLimit,
+    },
 }

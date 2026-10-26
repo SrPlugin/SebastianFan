@@ -1,3 +1,4 @@
+mod battery;
 mod config;
 mod curve;
 mod daemon;
@@ -8,8 +9,8 @@ mod service;
 mod status;
 
 use crate::cli::{
-    Cli, Command, ConfigCommand, CurveCommand, DaemonCommand, FanCommand, ProfileCommand,
-    SensorCommand,
+    BatteryCommand, Cli, Command, ConfigCommand, CurveCommand, DaemonCommand, FanCommand,
+    ProfileCommand, SensorCommand,
 };
 use crate::error::CliError;
 use crate::paths::Paths;
@@ -25,6 +26,8 @@ pub fn run(cli: &Cli) -> Result<String, CliError> {
         Command::Fan(FanCommand::Set { target, speed }) => {
             fan::set(&paths, (*target).into(), *speed)
         }
+        Command::Battery(BatteryCommand::Status) => Ok(battery::status(&paths)),
+        Command::Battery(BatteryCommand::Limit { state }) => battery::limit(&paths, *state),
         Command::Config(ConfigCommand::Path) => Ok(config::path(&cli.config)),
         Command::Config(ConfigCommand::Show) => config::show(&cli.config),
         Command::Config(ConfigCommand::Init { force }) => config::init(&cli.config, *force),
