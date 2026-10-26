@@ -22,6 +22,7 @@ impl NitroSense {
     pub fn new(dir: &Path) -> Self {
         Self {
             fan_speed_path: dir.join(FAN_SPEED_FILE),
+            battery_limiter_path: dir.join(BATTERY_LIMITER_FILE),
         }
     }
 
