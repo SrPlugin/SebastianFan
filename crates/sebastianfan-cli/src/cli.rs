@@ -16,13 +16,31 @@ pub const DEFAULT_CONFIG_PATH: &str = "/etc/sebastianfan/config.toml";
     arg_required_else_help = true
 )]
 pub struct Cli {
-    #[arg(long, global = true, value_name = "PATH", default_value = DEFAULT_CONFIG_PATH)]
+    #[arg(
+        long,
+        global = true,
+        value_name = "PATH",
+        default_value = DEFAULT_CONFIG_PATH,
+        help = "Path to the configuration file"
+    )]
     pub config: PathBuf,
 
-    #[arg(long, global = true, value_name = "DIR", default_value = "/")]
+    #[arg(
+        long,
+        global = true,
+        value_name = "DIR",
+        default_value = "/",
+        help = "Filesystem root used to locate /sys and /etc/systemd"
+    )]
     pub root: PathBuf,
 
-    #[arg(long, global = true, value_enum, default_value_t = LogLevel::Info)]
+    #[arg(
+        long,
+        global = true,
+        value_enum,
+        default_value_t = LogLevel::Info,
+        help = "Verbosity of the daemon log"
+    )]
     pub log_level: LogLevel,
 
     #[command(subcommand)]
