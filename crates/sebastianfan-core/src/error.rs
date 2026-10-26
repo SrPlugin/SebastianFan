@@ -12,6 +12,8 @@ pub enum ConfigError {
     UnorderedCurve,
     #[error("invalid fan speed {0:?}: use auto or a percentage from {MIN_MANUAL_PERCENT} to {MAX_PERCENT}")]
     InvalidFanSpeed(String),
+    #[error("invalid value {0:?}: use on or off")]
+    InvalidSwitch(String),
     #[error("sensor name must not be empty")]
     EmptySensor,
     #[error("poll_interval_ms must be at least {minimum_ms}")]
