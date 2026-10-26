@@ -39,6 +39,16 @@ fn fake_root() -> TempDir {
     write(root.path(), "sys/class/hwmon/hwmon5/name", "acer\n");
     write(root.path(), "sys/class/hwmon/hwmon5/fan1_input", "3564\n");
     write(root.path(), "sys/class/hwmon/hwmon5/fan2_input", "3307\n");
+    write(
+        root.path(),
+        "sys/firmware/acpi/platform_profile",
+        "balanced\n",
+    );
+    write(
+        root.path(),
+        "sys/firmware/acpi/platform_profile_choices",
+        "low-power quiet balanced balanced-performance\n",
+    );
     root
 }
 
@@ -117,4 +127,57 @@ fn fan_list_reports_unreadable_speeds_inline() {
         .stdout(
             predicate::str::contains("unavailable (").and(predicate::str::contains("3564 rpm")),
         );
+}
+
+#[test]
+fn profile_get_prints_the_active_profile() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["profile", "get"])
+        .assert()
+        .success()
+        .stdout("balanced\n");
+}
+
+#[test]
+fn profile_list_marks_the_active_profile() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["profile", "list"])
+        .assert()
+        .success()
+        .stdout("  low-power\n  quiet\n* balanced\n  balanced-performance\n");
+}
+
+#[test]
+fn profile_set_writes_the_profile() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["profile", "set", "quiet"])
+        .assert()
+        .success()
+        .stdout("profile set to quiet\n");
+    let written =
+        fs::read_to_string(root.path().join("sys/firmware/acpi/platform_profile")).unwrap();
+    assert_eq!(written, "quiet");
+}
+
+#[test]
+fn profile_set_refuses_profiles_the_machine_does_not_offer() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["profile", "set", "performance"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not supported by this machine"));
+}
+
+#[test]
+fn profile_set_rejects_unknown_names_before_touching_hardware() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["profile", "set", "turbo"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("possible values"));
 }

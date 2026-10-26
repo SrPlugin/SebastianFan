@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use sebastianfan_sysfs::{HWMON_DIR, THERMAL_DIR};
+use sebastianfan_sysfs::{HWMON_DIR, PLATFORM_PROFILE_DIR, THERMAL_DIR};
 
 #[derive(Debug, Clone)]
 pub struct Paths {
@@ -18,6 +18,10 @@ impl Paths {
 
     pub fn hwmon(&self) -> PathBuf {
         self.under(HWMON_DIR)
+    }
+
+    pub fn platform_profile(&self) -> PathBuf {
+        self.under(PLATFORM_PROFILE_DIR)
     }
 
     fn under(&self, absolute: &str) -> PathBuf {
@@ -39,6 +43,10 @@ mod tests {
     fn the_default_root_keeps_system_paths() {
         assert_eq!(Paths::default().thermal(), Path::new("/sys/class/thermal"));
         assert_eq!(Paths::default().hwmon(), Path::new("/sys/class/hwmon"));
+        assert_eq!(
+            Paths::default().platform_profile(),
+            Path::new("/sys/firmware/acpi")
+        );
     }
 
     #[test]
@@ -46,5 +54,9 @@ mod tests {
         let paths = Paths::new(PathBuf::from("/tmp/fake"));
         assert_eq!(paths.thermal(), Path::new("/tmp/fake/sys/class/thermal"));
         assert_eq!(paths.hwmon(), Path::new("/tmp/fake/sys/class/hwmon"));
+        assert_eq!(
+            paths.platform_profile(),
+            Path::new("/tmp/fake/sys/firmware/acpi")
+        );
     }
 }

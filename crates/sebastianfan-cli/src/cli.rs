@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
+use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{Parser, Subcommand};
+use sebastianfan_core::Profile;
 
 pub const DEFAULT_CONFIG_PATH: &str = "/etc/sebastianfan/config.toml";
 
@@ -29,6 +31,8 @@ pub enum Command {
     Sensor(SensorCommand),
     #[command(subcommand, about = "Inspect fans")]
     Fan(FanCommand),
+    #[command(subcommand, about = "Show or change the platform profile")]
+    Profile(ProfileCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -41,4 +45,22 @@ pub enum SensorCommand {
 pub enum FanCommand {
     #[command(about = "List fans with their current speed")]
     List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ProfileCommand {
+    #[command(about = "List the profiles supported by this machine")]
+    List,
+    #[command(about = "Print the active profile")]
+    Get,
+    #[command(about = "Activate a profile")]
+    Set {
+        #[arg(value_parser = profile_parser())]
+        profile: Profile,
+    },
+}
+
+fn profile_parser() -> impl TypedValueParser<Value = Profile> {
+    PossibleValuesParser::new(Profile::ALL.map(Profile::as_str))
+        .try_map(|name| name.parse::<Profile>())
 }
