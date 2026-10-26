@@ -15,7 +15,8 @@ It ships as a git-style CLI and a systemd daemon.
 ## Features
 
 - Inspect thermal zones, fan speeds and the active profile
-- Temperature curve with hysteresis, so profiles do not flap around a threshold
+- Set each fan to a fixed percentage, or back to automatic control
+- Temperature curve with hysteresis and a hold time, so profiles do not flap
 - Foreground or systemd-managed daemon that restores your original profile on exit
 - Strict, validated TOML configuration
 - No `unsafe` code and no runtime dependencies beyond the Linux kernel interfaces
@@ -23,8 +24,10 @@ It ships as a git-style CLI and a systemd daemon.
 ## Requirements
 
 - Linux with `platform_profile` support
-- Rust 1.80 or newer to build
-- Root privileges to change the profile or install the service
+- The `linuwu_sense` kernel module for fan speed control (installed by
+  [Div Acer Manager Max](https://github.com/PXDiv/Div-Acer-Manager-Max)); profiles work without it
+- Rust 1.82 or newer to build
+- Root privileges, or membership of the `linuwu_sense` group for fan control, to change settings
 
 ## Installation
 
@@ -54,6 +57,8 @@ The CLI follows a `sebastianfan <noun> <verb>` layout, like `git`.
 sebastianfan status
 sebastianfan sensor list
 sebastianfan fan list
+sebastianfan fan get
+sebastianfan fan set <cpu|gpu|all> <auto|20-100>
 sebastianfan profile list
 sebastianfan profile get
 sebastianfan profile set <name>
@@ -84,6 +89,16 @@ temperature    46.0 °C (x86_pkg_temp)
 fan acer/fan1  3546 rpm
 fan acer/fan2  3307 rpm
 
+$ sudo sebastianfan fan set cpu 60
+cpu 60%, gpu auto
+
+$ sudo sebastianfan fan set all auto
+cpu auto, gpu auto
+
+$ sebastianfan fan get
+cpu  60%   5061 rpm
+gpu  auto  4780 rpm
+
 $ sebastianfan sensor list
 thermal_zone0  acpitz           42.0 °C
 thermal_zone6  TCPU             42.0 °C
@@ -113,6 +128,7 @@ missing file means the defaults are used. Unknown keys are rejected.
 sensor = "x86_pkg_temp"
 poll_interval_ms = 1000
 hysteresis_celsius = 5
+min_hold_seconds = 30
 
 [[curve]]
 min_celsius = 0
@@ -132,6 +148,7 @@ profile = "balanced-performance"
 | `sensor` | Thermal zone name (`thermal_zone8`) or type (`x86_pkg_temp`, `TCPU`), see `sensor list` |
 | `poll_interval_ms` | Time between readings, at least 100 |
 | `hysteresis_celsius` | Degrees the temperature must drop below a step before it steps down |
+| `min_hold_seconds` | Minimum time a profile is kept before stepping down, rising is never delayed |
 | `curve` | Steps ordered by strictly increasing `min_celsius` |
 
 Check a file before installing it:
@@ -145,7 +162,8 @@ sebastianfan curve validate ./candidate.toml
 1. The daemon reads the configured thermal zone every `poll_interval_ms`.
 2. The governor picks the highest curve step whose threshold has been reached.
 3. It steps up immediately, and steps down only after the temperature falls
-   below the step threshold minus `hysteresis_celsius`.
+   below the step threshold minus `hysteresis_celsius` and the profile has been
+   held for `min_hold_seconds`.
 4. The profile is written to `platform_profile` only when it changes.
 5. On `SIGINT` or `SIGTERM`, or if a reading fails, the original profile is
    restored before exiting.
@@ -156,11 +174,23 @@ in `platform_profile_choices` and refuses to run otherwise.
 Profiles change the firmware fan curve and the power limits together, so a
 `quiet` profile also lowers sustained performance.
 
+## Fan speed
+
+`fan set` writes the `cpu,gpu` percentages to
+`/sys/devices/platform/acer-wmi/nitro_sense/fan_speed`, the attribute exposed by
+the `linuwu_sense` driver, where `0` means automatic. Manual speeds are limited
+to 20-100 % so a fan cannot be stalled by mistake, and the setting stays in
+place until you set `auto` again or reboot.
+
+The stock `acer-wmi` driver of Linux 6.17 only reads fan speeds. Calling the
+firmware's WMI fan methods directly is rejected on the Acer Nitro ANV15-51, so
+the kernel driver is required.
+
 ## Limitations
 
-SebastianFan selects profiles. It cannot set an exact fan speed: on the Acer
-Nitro line that goes through an undocumented WMI method handled by the firmware.
-A Rust kernel module for direct RPM control is planned.
+- Fan speed control depends on `linuwu_sense`, a third-party kernel module.
+- Both this daemon and Div Acer Manager Max can change the platform profile. Run
+  only one of them as the profile controller.
 
 ## Project layout
 
