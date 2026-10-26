@@ -11,6 +11,7 @@ authors = ["SrPlugin <sebastianrcheikh@gmail.com>"]
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
+sebastianfan-core = { path = "crates/sebastianfan-core", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 signal-hook = "0.4"
 tempfile = "3"

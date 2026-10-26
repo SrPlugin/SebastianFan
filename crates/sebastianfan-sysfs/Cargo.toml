@@ -1,0 +1,17 @@
+[package]
+name = "sebastianfan-sysfs"
+description = "Linux sysfs adapters for thermal zones, hwmon fans and platform profiles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sebastianfan-core.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
