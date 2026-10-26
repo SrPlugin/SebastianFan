@@ -37,6 +37,8 @@ pub enum Command {
     Profile(ProfileCommand),
     #[command(subcommand, about = "Inspect and validate the temperature curve")]
     Curve(CurveCommand),
+    #[command(subcommand, about = "Show or create the configuration file")]
+    Config(ConfigCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -77,5 +79,18 @@ pub enum CurveCommand {
     Validate {
         #[arg(value_name = "FILE")]
         file: PathBuf,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum ConfigCommand {
+    #[command(about = "Print the path of the configuration file")]
+    Path,
+    #[command(about = "Print the effective configuration")]
+    Show,
+    #[command(about = "Write the default configuration file")]
+    Init {
+        #[arg(long, help = "Overwrite the file if it already exists")]
+        force: bool,
     },
 }

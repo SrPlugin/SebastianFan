@@ -315,3 +315,80 @@ fn curve_validate_fails_for_a_missing_file() {
         .failure()
         .stderr(predicate::str::starts_with("error: "));
 }
+
+#[test]
+fn config_path_prints_the_selected_file() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["--config", "/tmp/custom.toml", "config", "path"])
+        .assert()
+        .success()
+        .stdout("/tmp/custom.toml\n");
+}
+
+#[test]
+fn config_show_prints_the_defaults_when_no_file_exists() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(root.path().join("absent.toml"))
+        .args(["config", "show"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("sensor = \"x86_pkg_temp\"")
+                .and(predicate::str::contains("[[curve]]"))
+                .and(predicate::str::ends_with("\"balanced-performance\"\n")),
+        );
+}
+
+#[test]
+fn config_init_writes_a_loadable_default_file() {
+    let root = fake_root();
+    let config = root.path().join("etc/sebastianfan/config.toml");
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["config", "init"])
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("wrote "));
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["curve", "validate"])
+        .arg(&config)
+        .assert()
+        .success();
+}
+
+#[test]
+fn config_init_refuses_to_overwrite_without_force() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "sensor = \"TCPU\"").unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["config", "init"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("already exists"));
+    assert_eq!(fs::read_to_string(&config).unwrap(), "sensor = \"TCPU\"");
+}
+
+#[test]
+fn config_init_overwrites_with_force() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "sensor = \"TCPU\"").unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["config", "init", "--force"])
+        .assert()
+        .success();
+    assert!(fs::read_to_string(&config)
+        .unwrap()
+        .contains("x86_pkg_temp"));
+}

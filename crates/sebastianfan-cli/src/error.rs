@@ -16,6 +16,8 @@ pub enum CliError {
         #[source]
         source: ConfigError,
     },
+    #[error("{} already exists, use --force to overwrite it", .0.display())]
+    AlreadyExists(PathBuf),
     #[error("{}: {source}", .path.display())]
     Io {
         path: PathBuf,

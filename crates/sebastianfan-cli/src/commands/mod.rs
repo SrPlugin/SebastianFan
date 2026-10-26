@@ -1,10 +1,13 @@
+mod config;
 mod curve;
 mod fan;
 mod profile;
 mod sensor;
 mod status;
 
-use crate::cli::{Cli, Command, CurveCommand, FanCommand, ProfileCommand, SensorCommand};
+use crate::cli::{
+    Cli, Command, ConfigCommand, CurveCommand, FanCommand, ProfileCommand, SensorCommand,
+};
 use crate::error::CliError;
 use crate::paths::Paths;
 use crate::store;
@@ -15,6 +18,9 @@ pub fn run(cli: &Cli) -> Result<String, CliError> {
         Command::Status => Ok(status::show(&paths, &store::load(&cli.config)?)),
         Command::Sensor(SensorCommand::List) => sensor::list(&paths),
         Command::Fan(FanCommand::List) => fan::list(&paths),
+        Command::Config(ConfigCommand::Path) => Ok(config::path(&cli.config)),
+        Command::Config(ConfigCommand::Show) => config::show(&cli.config),
+        Command::Config(ConfigCommand::Init { force }) => config::init(&cli.config, *force),
         Command::Curve(CurveCommand::Show) => Ok(curve::show(&store::load(&cli.config)?)),
         Command::Curve(CurveCommand::Validate { file }) => curve::validate(file),
         Command::Profile(ProfileCommand::List) => profile::list(&paths),
