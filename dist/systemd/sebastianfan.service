@@ -1,0 +1,18 @@
+[Unit]
+Description=SebastianFan thermal profile daemon
+Documentation=https://github.com/SrPlugin/SebastianFan
+
+[Service]
+Type=simple
+ExecStart=@BINARY@ --config @CONFIG@ daemon run
+Restart=on-failure
+RestartSec=2
+KillSignal=SIGTERM
+TimeoutStopSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+
+[Install]
+WantedBy=multi-user.target
