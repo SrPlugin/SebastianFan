@@ -13,6 +13,7 @@ pub struct Config {
     pub sensor: String,
     pub poll_interval_ms: u64,
     pub hysteresis_celsius: u32,
+    pub min_hold_seconds: u64,
     pub curve: Curve,
 }
 
@@ -22,6 +23,7 @@ impl Default for Config {
             sensor: "x86_pkg_temp".to_owned(),
             poll_interval_ms: 1000,
             hysteresis_celsius: 5,
+            min_hold_seconds: 30,
             curve: Curve::default(),
         }
     }
@@ -36,6 +38,10 @@ impl Config {
 
     pub fn to_toml(&self) -> Result<String, ConfigError> {
         Ok(toml::to_string_pretty(self)?)
+    }
+
+    pub fn min_hold(&self) -> Duration {
+        Duration::from_secs(self.min_hold_seconds)
     }
 
     pub fn poll_interval(&self) -> Duration {
@@ -78,6 +84,7 @@ mod tests {
             sensor = "TCPU"
             poll_interval_ms = 500
             hysteresis_celsius = 3
+            min_hold_seconds = 12
 
             [[curve]]
             min_celsius = 20
@@ -91,6 +98,7 @@ mod tests {
         assert_eq!(config.sensor, "TCPU");
         assert_eq!(config.poll_interval(), Duration::from_millis(500));
         assert_eq!(config.hysteresis_celsius, 3);
+        assert_eq!(config.min_hold(), Duration::from_secs(12));
         assert_eq!(config.curve.steps().len(), 2);
         assert_eq!(config.curve.steps()[1].profile, Profile::Performance);
     }
@@ -100,6 +108,11 @@ mod tests {
         let config = Config::from_toml("hysteresis_celsius = 8").unwrap();
         assert_eq!(config.hysteresis_celsius, 8);
         assert_eq!(config.sensor, Config::default().sensor);
+    }
+
+    #[test]
+    fn the_default_hold_is_thirty_seconds() {
+        assert_eq!(Config::default().min_hold(), Duration::from_secs(30));
     }
 
     #[test]

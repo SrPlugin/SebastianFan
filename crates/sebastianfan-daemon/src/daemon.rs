@@ -23,7 +23,11 @@ impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
         Self {
             sensor,
             control,
-            governor: Governor::new(config.curve.clone(), config.hysteresis_celsius),
+            governor: Governor::new(
+                config.curve.clone(),
+                config.hysteresis_celsius,
+                config.min_hold(),
+            ),
             interval: config.poll_interval(),
             required: config
                 .curve
@@ -37,7 +41,7 @@ impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
 
     pub fn tick(&mut self) -> Result<Profile, HardwareError> {
         let temperature = self.sensor.read()?;
-        let profile = self.governor.update(temperature);
+        let profile = self.governor.update(temperature, Instant::now());
         if self.applied != Some(profile) {
             self.control.set(profile)?;
             info!(%temperature, %profile, "profile changed");
