@@ -5,9 +5,9 @@ members = ["crates/*"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-license = "GPL-2.0-only"
+license = "MIT"
 repository = "https://github.com/SrPlugin/SebastianFan"
-authors = ["Sebastian <sebastianrcheikh@gmail.com>"]
+authors = ["SrPlugin <sebastianrcheikh@gmail.com>"]
 
 [workspace.dependencies]
 clap = { version = "4", features = ["derive"] }
