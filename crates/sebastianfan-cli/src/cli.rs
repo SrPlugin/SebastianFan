@@ -27,10 +27,18 @@ pub struct Cli {
 pub enum Command {
     #[command(subcommand, about = "Inspect temperature sensors")]
     Sensor(SensorCommand),
+    #[command(subcommand, about = "Inspect fans")]
+    Fan(FanCommand),
 }
 
 #[derive(Debug, Subcommand)]
 pub enum SensorCommand {
     #[command(about = "List thermal zones with their current temperature")]
+    List,
+}
+
+#[derive(Debug, Subcommand)]
+pub enum FanCommand {
+    #[command(about = "List fans with their current speed")]
     List,
 }

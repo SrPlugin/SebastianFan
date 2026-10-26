@@ -35,6 +35,10 @@ fn fake_root() -> TempDir {
         "sys/class/thermal/thermal_zone1/temp",
         "43500\n",
     );
+    write(root.path(), "sys/class/hwmon/hwmon3/name", "nvme\n");
+    write(root.path(), "sys/class/hwmon/hwmon5/name", "acer\n");
+    write(root.path(), "sys/class/hwmon/hwmon5/fan1_input", "3564\n");
+    write(root.path(), "sys/class/hwmon/hwmon5/fan2_input", "3307\n");
     root
 }
 
@@ -79,4 +83,38 @@ fn sensor_list_fails_when_sysfs_is_missing() {
         .assert()
         .failure()
         .stderr(predicate::str::starts_with("error: "));
+}
+
+#[test]
+fn fan_list_shows_every_fan_with_its_speed() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["fan", "list"])
+        .assert()
+        .success()
+        .stdout("acer  fan1  3564 rpm\nacer  fan2  3307 rpm\n");
+}
+
+#[test]
+fn fan_list_is_empty_when_no_fan_is_exposed() {
+    let root = tempfile::tempdir().unwrap();
+    fs::create_dir_all(root.path().join("sys/class/hwmon")).unwrap();
+    sebastianfan(&root)
+        .args(["fan", "list"])
+        .assert()
+        .success()
+        .stdout("");
+}
+
+#[test]
+fn fan_list_reports_unreadable_speeds_inline() {
+    let root = fake_root();
+    write(root.path(), "sys/class/hwmon/hwmon5/fan2_input", "fast\n");
+    sebastianfan(&root)
+        .args(["fan", "list"])
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("unavailable (").and(predicate::str::contains("3564 rpm")),
+        );
 }
