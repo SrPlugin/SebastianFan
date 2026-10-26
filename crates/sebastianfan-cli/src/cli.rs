@@ -1,8 +1,9 @@
 use std::path::PathBuf;
 
 use clap::builder::{PossibleValuesParser, TypedValueParser};
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use sebastianfan_core::Profile;
+use tracing::Level;
 
 pub const DEFAULT_CONFIG_PATH: &str = "/etc/sebastianfan/config.toml";
 
@@ -21,8 +22,32 @@ pub struct Cli {
     #[arg(long, global = true, value_name = "DIR", default_value = "/")]
     pub root: PathBuf,
 
+    #[arg(long, global = true, value_enum, default_value_t = LogLevel::Info)]
+    pub log_level: LogLevel,
+
     #[command(subcommand)]
     pub command: Command,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum LogLevel {
+    Error,
+    Warn,
+    Info,
+    Debug,
+    Trace,
+}
+
+impl From<LogLevel> for Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Error => Level::ERROR,
+            LogLevel::Warn => Level::WARN,
+            LogLevel::Info => Level::INFO,
+            LogLevel::Debug => Level::DEBUG,
+            LogLevel::Trace => Level::TRACE,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]
@@ -39,6 +64,8 @@ pub enum Command {
     Curve(CurveCommand),
     #[command(subcommand, about = "Show or create the configuration file")]
     Config(ConfigCommand),
+    #[command(subcommand, about = "Run the background control loop")]
+    Daemon(DaemonCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -93,4 +120,10 @@ pub enum ConfigCommand {
         #[arg(long, help = "Overwrite the file if it already exists")]
         force: bool,
     },
+}
+
+#[derive(Debug, Subcommand)]
+pub enum DaemonCommand {
+    #[command(about = "Run the control loop in the foreground")]
+    Run,
 }

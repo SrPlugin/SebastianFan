@@ -2,6 +2,9 @@
 
 use std::fs;
 use std::path::Path;
+use std::process::{Command as StdCommand, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
 
 use assert_cmd::Command;
 use predicates::prelude::*;
@@ -391,4 +394,104 @@ fn config_init_overwrites_with_force() {
     assert!(fs::read_to_string(&config)
         .unwrap()
         .contains("x86_pkg_temp"));
+}
+
+fn wait_until(condition: impl Fn() -> bool) {
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while !condition() {
+        assert!(
+            Instant::now() < deadline,
+            "condition not met within 5 seconds"
+        );
+        thread::sleep(Duration::from_millis(20));
+    }
+}
+
+fn spawn_daemon(root: &TempDir, config: &Path, extra: &[&str]) -> std::process::Child {
+    StdCommand::new(env!("CARGO_BIN_EXE_sebastianfan"))
+        .arg("--root")
+        .arg(root.path())
+        .arg("--config")
+        .arg(config)
+        .args(extra)
+        .args(["daemon", "run"])
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap()
+}
+
+fn terminate(child: &std::process::Child) {
+    StdCommand::new("kill")
+        .args(["-TERM", &child.id().to_string()])
+        .status()
+        .unwrap();
+}
+
+fn profile_file(root: &TempDir) -> std::path::PathBuf {
+    root.path().join("sys/firmware/acpi/platform_profile")
+}
+
+#[test]
+fn daemon_run_applies_the_curve_and_restores_the_profile_on_sigterm() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "poll_interval_ms = 100").unwrap();
+    let child = spawn_daemon(&root, &config, &[]);
+    wait_until(|| fs::read_to_string(profile_file(&root)).is_ok_and(|value| value == "quiet"));
+    terminate(&child);
+    let output = child.wait_with_output().unwrap();
+    let log = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "{log}");
+    assert_eq!(fs::read_to_string(profile_file(&root)).unwrap(), "balanced");
+    assert!(log.contains("profile changed"), "{log}");
+    assert!(log.contains("restored original profile"), "{log}");
+}
+
+#[test]
+fn daemon_run_honors_the_log_level() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "poll_interval_ms = 100").unwrap();
+    let child = spawn_daemon(&root, &config, &["--log-level", "error"]);
+    wait_until(|| fs::read_to_string(profile_file(&root)).is_ok_and(|value| value == "quiet"));
+    terminate(&child);
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn daemon_run_refuses_a_curve_the_machine_cannot_apply() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(
+        &config,
+        "[[curve]]\nmin_celsius = 0\nprofile = \"performance\"\n",
+    )
+    .unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["daemon", "run"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not supported by this machine"));
+    assert_eq!(
+        fs::read_to_string(profile_file(&root)).unwrap(),
+        "balanced\n"
+    );
+}
+
+#[test]
+fn daemon_run_fails_when_the_configured_sensor_does_not_exist() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "sensor = \"GPU\"").unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["daemon", "run"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("not found"));
 }

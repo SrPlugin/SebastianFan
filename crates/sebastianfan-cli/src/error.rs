@@ -16,6 +16,8 @@ pub enum CliError {
         #[source]
         source: ConfigError,
     },
+    #[error("cannot install signal handlers: {0}")]
+    Signals(#[source] io::Error),
     #[error("{} already exists, use --force to overwrite it", .0.display())]
     AlreadyExists(PathBuf),
     #[error("{}: {source}", .path.display())]
