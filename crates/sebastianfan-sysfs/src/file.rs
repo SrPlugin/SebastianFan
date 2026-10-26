@@ -25,6 +25,10 @@ pub(crate) fn read_parsed<T: FromStr>(path: &Path) -> Result<T, HardwareError> {
     })
 }
 
+pub(crate) fn write_value(path: &Path, value: &str) -> Result<(), HardwareError> {
+    fs::write(path, value).map_err(|source| io_error(path, source))
+}
+
 pub(crate) fn list_entries(dir: &Path) -> Result<Vec<PathBuf>, HardwareError> {
     let entries = fs::read_dir(dir).map_err(|source| io_error(dir, source))?;
     Ok(entries
@@ -77,6 +81,14 @@ mod tests {
         write_file(dir.path(), "value", "abc");
         let error = read_parsed::<u32>(&dir.path().join("value")).unwrap_err();
         assert!(matches!(error, HardwareError::Malformed { value, .. } if value == "abc"));
+    }
+
+    #[test]
+    fn writes_values_to_existing_files() {
+        let dir = tempfile::tempdir().unwrap();
+        write_file(dir.path(), "value", "old");
+        write_value(&dir.path().join("value"), "new").unwrap();
+        assert_eq!(read_trimmed(&dir.path().join("value")).unwrap(), "new");
     }
 
     #[test]
