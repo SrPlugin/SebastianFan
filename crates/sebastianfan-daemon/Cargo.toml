@@ -1,0 +1,15 @@
+[package]
+name = "sebastianfan-daemon"
+description = "Control loop that maps temperature readings to platform profiles"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+sebastianfan-core.workspace = true
+signal-hook.workspace = true
+
+[lints]
+workspace = true
