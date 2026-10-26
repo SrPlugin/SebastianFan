@@ -10,8 +10,12 @@ repository = "https://github.com/SrPlugin/SebastianFan"
 authors = ["SrPlugin <sebastianrcheikh@gmail.com>"]
 
 [workspace.dependencies]
+assert_cmd = "2"
 clap = { version = "4", features = ["derive"] }
+predicates = "3"
 sebastianfan-core = { path = "crates/sebastianfan-core", version = "0.1.0" }
+sebastianfan-daemon = { path = "crates/sebastianfan-daemon", version = "0.1.0" }
+sebastianfan-sysfs = { path = "crates/sebastianfan-sysfs", version = "0.1.0" }
 serde = { version = "1", features = ["derive"] }
 signal-hook = "0.4"
 tempfile = "3"
