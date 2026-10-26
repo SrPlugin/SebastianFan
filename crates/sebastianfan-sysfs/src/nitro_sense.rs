@@ -1,17 +1,21 @@
 use std::path::{Path, PathBuf};
 
-use sebastianfan_core::{FanControl, FanSetting, FanSpeed, HardwareError, MAX_PERCENT};
+use sebastianfan_core::{
+    BatteryControl, ChargeLimit, FanControl, FanSetting, FanSpeed, HardwareError, MAX_PERCENT,
+};
 
 use crate::file::{read_trimmed, write_value};
 
 pub const NITRO_SENSE_DIR: &str = "/sys/devices/platform/acer-wmi/nitro_sense";
 
 const FAN_SPEED_FILE: &str = "fan_speed";
+const BATTERY_LIMITER_FILE: &str = "battery_limiter";
 const AUTO_RAW: u8 = 0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NitroSense {
     fan_speed_path: PathBuf,
+    battery_limiter_path: PathBuf,
 }
 
 impl NitroSense {
@@ -60,6 +64,27 @@ impl FanControl for NitroSense {
         write_value(
             &self.fan_speed_path,
             &format!("{},{}", raw(setting.cpu), raw(setting.gpu)),
+        )
+    }
+}
+
+impl BatteryControl for NitroSense {
+    fn charge_limit(&self) -> Result<ChargeLimit, HardwareError> {
+        let value = read_trimmed(&self.battery_limiter_path)?;
+        match value.as_str() {
+            "0" => Ok(ChargeLimit::Off),
+            "1" => Ok(ChargeLimit::On),
+            _ => Err(HardwareError::Malformed {
+                path: self.battery_limiter_path.clone(),
+                value,
+            }),
+        }
+    }
+
+    fn set_charge_limit(&self, limit: ChargeLimit) -> Result<(), HardwareError> {
+        write_value(
+            &self.battery_limiter_path,
+            if limit.is_on() { "1" } else { "0" },
         )
     }
 }
@@ -139,5 +164,50 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let control = NitroSense::new(&dir.path().join("absent"));
         assert!(matches!(control.get(), Err(HardwareError::Io { .. })));
+    }
+
+    #[test]
+    fn reads_the_charge_limit() {
+        let (dir, control) = control_with("0,0\n");
+        write_file(dir.path(), BATTERY_LIMITER_FILE, "1\n");
+        assert_eq!(control.charge_limit().unwrap(), ChargeLimit::On);
+        write_file(dir.path(), BATTERY_LIMITER_FILE, "0\n");
+        assert_eq!(control.charge_limit().unwrap(), ChargeLimit::Off);
+    }
+
+    #[test]
+    fn writes_the_charge_limit_in_the_driver_format() {
+        let (dir, control) = control_with("0,0\n");
+        write_file(dir.path(), BATTERY_LIMITER_FILE, "0\n");
+        control.set_charge_limit(ChargeLimit::On).unwrap();
+        assert_eq!(
+            read_trimmed(&dir.path().join(BATTERY_LIMITER_FILE)).unwrap(),
+            "1"
+        );
+        control.set_charge_limit(ChargeLimit::Off).unwrap();
+        assert_eq!(
+            read_trimmed(&dir.path().join(BATTERY_LIMITER_FILE)).unwrap(),
+            "0"
+        );
+    }
+
+    #[test]
+    fn rejects_an_unexpected_charge_limit_value() {
+        let (dir, control) = control_with("0,0\n");
+        write_file(dir.path(), BATTERY_LIMITER_FILE, "2\n");
+        assert!(matches!(
+            control.charge_limit(),
+            Err(HardwareError::Malformed { .. })
+        ));
+    }
+
+    #[test]
+    fn fails_to_read_the_charge_limit_when_the_driver_is_not_loaded() {
+        let dir = tempfile::tempdir().unwrap();
+        let control = NitroSense::new(&dir.path().join("absent"));
+        assert!(matches!(
+            control.charge_limit(),
+            Err(HardwareError::Io { .. })
+        ));
     }
 }
