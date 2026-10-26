@@ -1,5 +1,7 @@
 use thiserror::Error;
 
+use crate::fan::{MAX_PERCENT, MIN_MANUAL_PERCENT};
+
 #[derive(Debug, Error)]
 pub enum ConfigError {
     #[error("unknown profile: {0}")]
@@ -8,6 +10,8 @@ pub enum ConfigError {
     EmptyCurve,
     #[error("curve steps must have strictly increasing min_celsius values")]
     UnorderedCurve,
+    #[error("invalid fan speed {0:?}: use auto or a percentage from {MIN_MANUAL_PERCENT} to {MAX_PERCENT}")]
+    InvalidFanSpeed(String),
     #[error("sensor name must not be empty")]
     EmptySensor,
     #[error("poll_interval_ms must be at least {minimum_ms}")]
