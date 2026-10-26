@@ -55,6 +55,27 @@ impl Curve {
     }
 }
 
+impl Default for Curve {
+    fn default() -> Self {
+        Self {
+            steps: vec![
+                Step {
+                    min_celsius: 0,
+                    profile: Profile::Quiet,
+                },
+                Step {
+                    min_celsius: 55,
+                    profile: Profile::Balanced,
+                },
+                Step {
+                    min_celsius: 75,
+                    profile: Profile::BalancedPerformance,
+                },
+            ],
+        }
+    }
+}
+
 impl TryFrom<Vec<Step>> for Curve {
     type Error = ConfigError;
 
