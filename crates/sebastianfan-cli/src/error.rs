@@ -1,4 +1,5 @@
 use std::io;
+use std::path::PathBuf;
 
 use sebastianfan_core::{ConfigError, HardwareError};
 use thiserror::Error;
@@ -9,15 +10,28 @@ pub enum CliError {
     Config(#[from] ConfigError),
     #[error(transparent)]
     Hardware(#[from] HardwareError),
+    #[error("{}: {source}", .path.display())]
+    InvalidConfig {
+        path: PathBuf,
+        #[source]
+        source: ConfigError,
+    },
+    #[error("{}: {source}", .path.display())]
+    Io {
+        path: PathBuf,
+        #[source]
+        source: io::Error,
+    },
 }
 
 impl CliError {
     pub fn is_permission_denied(&self) -> bool {
-        matches!(
-            self,
-            CliError::Hardware(HardwareError::Io { source, .. })
-                if source.kind() == io::ErrorKind::PermissionDenied
-        )
+        match self {
+            CliError::Hardware(HardwareError::Io { source, .. }) | CliError::Io { source, .. } => {
+                source.kind() == io::ErrorKind::PermissionDenied
+            }
+            _ => false,
+        }
     }
 
     pub fn report(&self) -> String {
@@ -31,8 +45,6 @@ impl CliError {
 
 #[cfg(test)]
 mod tests {
-    use std::path::PathBuf;
-
     use super::*;
 
     fn io_error(kind: io::ErrorKind) -> CliError {
@@ -47,6 +59,15 @@ mod tests {
         let report = io_error(io::ErrorKind::PermissionDenied).report();
         assert!(report.starts_with("error: /sys/example: "));
         assert!(report.contains("hint: "));
+    }
+
+    #[test]
+    fn permission_errors_on_plain_files_suggest_root() {
+        let error = CliError::Io {
+            path: PathBuf::from("/etc/sebastianfan/config.toml"),
+            source: io::Error::from(io::ErrorKind::PermissionDenied),
+        };
+        assert!(error.report().contains("hint: "));
     }
 
     #[test]

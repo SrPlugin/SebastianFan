@@ -3,6 +3,7 @@ mod commands;
 mod error;
 mod paths;
 mod render;
+mod store;
 
 use std::process::ExitCode;
 

@@ -181,3 +181,65 @@ fn profile_set_rejects_unknown_names_before_touching_hardware() {
         .failure()
         .stderr(predicate::str::contains("possible values"));
 }
+
+#[test]
+fn status_summarizes_profile_temperature_and_fans() {
+    let root = fake_root();
+    let missing_config = root.path().join("absent.toml");
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&missing_config)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("profile")
+                .and(predicate::str::contains("balanced"))
+                .and(predicate::str::contains("43.5 °C (x86_pkg_temp)"))
+                .and(predicate::str::contains("fan acer/fan1"))
+                .and(predicate::str::contains("3307 rpm")),
+        );
+}
+
+#[test]
+fn status_reads_the_sensor_from_the_configuration() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "sensor = \"acpitz\"").unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("42.0 °C (acpitz)"));
+}
+
+#[test]
+fn status_degrades_gracefully_on_unsupported_hardware() {
+    let root = tempfile::tempdir().unwrap();
+    let missing_config = root.path().join("absent.toml");
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&missing_config)
+        .arg("status")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("unavailable").count(3));
+}
+
+#[test]
+fn status_fails_on_an_invalid_configuration() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(&config, "poll_interval_ms = 1").unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .arg("status")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "poll_interval_ms must be at least",
+        ));
+}

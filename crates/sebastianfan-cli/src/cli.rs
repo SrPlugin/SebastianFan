@@ -27,6 +27,8 @@ pub struct Cli {
 
 #[derive(Debug, Subcommand)]
 pub enum Command {
+    #[command(about = "Show the active profile, temperature and fan speeds")]
+    Status,
     #[command(subcommand, about = "Inspect temperature sensors")]
     Sensor(SensorCommand),
     #[command(subcommand, about = "Inspect fans")]
