@@ -21,6 +21,10 @@ pub fn run(cli: &Cli) -> Result<String, CliError> {
         Command::Status => Ok(status::show(&paths, &store::load(&cli.config)?)),
         Command::Sensor(SensorCommand::List) => sensor::list(&paths),
         Command::Fan(FanCommand::List) => fan::list(&paths),
+        Command::Fan(FanCommand::Get) => fan::get(&paths),
+        Command::Fan(FanCommand::Set { target, speed }) => {
+            fan::set(&paths, (*target).into(), *speed)
+        }
         Command::Config(ConfigCommand::Path) => Ok(config::path(&cli.config)),
         Command::Config(ConfigCommand::Show) => config::show(&cli.config),
         Command::Config(ConfigCommand::Init { force }) => config::init(&cli.config, *force),

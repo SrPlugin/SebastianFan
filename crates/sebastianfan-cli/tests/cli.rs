@@ -20,6 +20,11 @@ fn fake_root() -> TempDir {
     let root = tempfile::tempdir().unwrap();
     write(
         root.path(),
+        "sys/devices/platform/acer-wmi/nitro_sense/fan_speed",
+        "0,0\n",
+    );
+    write(
+        root.path(),
         "sys/class/thermal/thermal_zone0/type",
         "acpitz\n",
     );
@@ -540,4 +545,87 @@ fn daemon_uninstall_is_idempotent() {
         .assert()
         .success()
         .stdout(predicate::str::ends_with("is not installed\n"));
+}
+
+fn fan_speed_file(root: &TempDir) -> std::path::PathBuf {
+    root.path()
+        .join("sys/devices/platform/acer-wmi/nitro_sense/fan_speed")
+}
+
+#[test]
+fn fan_get_shows_mode_and_speed_of_each_fan() {
+    let root = fake_root();
+    fs::write(fan_speed_file(&root), "60,0\n").unwrap();
+    sebastianfan(&root)
+        .args(["fan", "get"])
+        .assert()
+        .success()
+        .stdout("cpu  60%   3564 rpm\ngpu  auto  3307 rpm\n");
+}
+
+#[test]
+fn fan_set_applies_a_percentage_to_one_fan() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["fan", "set", "cpu", "60"])
+        .assert()
+        .success()
+        .stdout("cpu 60%, gpu auto\n");
+    assert_eq!(fs::read_to_string(fan_speed_file(&root)).unwrap(), "60,0");
+}
+
+#[test]
+fn fan_set_keeps_the_other_fan_untouched() {
+    let root = fake_root();
+    fs::write(fan_speed_file(&root), "0,45\n").unwrap();
+    sebastianfan(&root)
+        .args(["fan", "set", "cpu", "70%"])
+        .assert()
+        .success();
+    assert_eq!(fs::read_to_string(fan_speed_file(&root)).unwrap(), "70,45");
+}
+
+#[test]
+fn fan_set_all_returns_both_fans_to_auto() {
+    let root = fake_root();
+    fs::write(fan_speed_file(&root), "80,80\n").unwrap();
+    sebastianfan(&root)
+        .args(["fan", "set", "all", "auto"])
+        .assert()
+        .success()
+        .stdout("cpu auto, gpu auto\n");
+    assert_eq!(fs::read_to_string(fan_speed_file(&root)).unwrap(), "0,0");
+}
+
+#[test]
+fn fan_set_rejects_speeds_that_could_stall_a_fan() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["fan", "set", "cpu", "5"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "use auto or a percentage from 20 to 100",
+        ));
+    assert_eq!(fs::read_to_string(fan_speed_file(&root)).unwrap(), "0,0\n");
+}
+
+#[test]
+fn fan_set_rejects_unknown_fans() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["fan", "set", "case", "50"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("possible values"));
+}
+
+#[test]
+fn fan_set_fails_when_the_driver_is_not_loaded() {
+    let root = tempfile::tempdir().unwrap();
+    sebastianfan(&root)
+        .args(["fan", "set", "cpu", "50"])
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with("error: "));
 }

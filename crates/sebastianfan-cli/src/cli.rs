@@ -2,7 +2,7 @@ use std::path::PathBuf;
 
 use clap::builder::{PossibleValuesParser, TypedValueParser};
 use clap::{Parser, Subcommand, ValueEnum};
-use sebastianfan_core::Profile;
+use sebastianfan_core::{FanSpeed, FanTarget, Profile};
 use tracing::Level;
 
 pub const DEFAULT_CONFIG_PATH: &str = "/etc/sebastianfan/config.toml";
@@ -96,6 +96,36 @@ pub enum SensorCommand {
 pub enum FanCommand {
     #[command(about = "List fans with their current speed")]
     List,
+    #[command(about = "Show the fan control mode and speed of each fan")]
+    Get,
+    #[command(about = "Set a fan to a percentage (20-100) or back to auto")]
+    Set {
+        #[arg(value_enum, help = "Fan to control")]
+        target: TargetArg,
+        #[arg(
+            value_name = "SPEED",
+            value_parser = |value: &str| value.parse::<FanSpeed>(),
+            help = "auto, or a percentage from 20 to 100"
+        )]
+        speed: FanSpeed,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TargetArg {
+    Cpu,
+    Gpu,
+    All,
+}
+
+impl From<TargetArg> for FanTarget {
+    fn from(target: TargetArg) -> Self {
+        match target {
+            TargetArg::Cpu => FanTarget::Cpu,
+            TargetArg::Gpu => FanTarget::Gpu,
+            TargetArg::All => FanTarget::All,
+        }
+    }
 }
 
 #[derive(Debug, Subcommand)]

@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use sebastianfan_sysfs::{HWMON_DIR, PLATFORM_PROFILE_DIR, THERMAL_DIR};
+use sebastianfan_sysfs::{HWMON_DIR, NITRO_SENSE_DIR, PLATFORM_PROFILE_DIR, THERMAL_DIR};
 
 #[derive(Debug, Clone)]
 pub struct Paths {
@@ -22,6 +22,10 @@ impl Paths {
 
     pub fn platform_profile(&self) -> PathBuf {
         self.under(PLATFORM_PROFILE_DIR)
+    }
+
+    pub fn nitro_sense(&self) -> PathBuf {
+        self.under(NITRO_SENSE_DIR)
     }
 
     pub fn systemd_units(&self) -> PathBuf {
@@ -51,6 +55,10 @@ mod tests {
     fn the_default_root_keeps_system_paths() {
         assert_eq!(Paths::default().thermal(), Path::new("/sys/class/thermal"));
         assert_eq!(Paths::default().hwmon(), Path::new("/sys/class/hwmon"));
+        assert_eq!(
+            Paths::default().nitro_sense(),
+            Path::new("/sys/devices/platform/acer-wmi/nitro_sense")
+        );
         assert_eq!(
             Paths::default().systemd_units(),
             Path::new("/etc/systemd/system")
