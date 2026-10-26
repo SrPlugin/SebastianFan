@@ -6,17 +6,23 @@ use sebastianfan_core::Config;
 
 use crate::error::CliError;
 
+pub fn read(path: &Path) -> Result<Config, CliError> {
+    let source = fs::read_to_string(path).map_err(|source| CliError::Io {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    Config::from_toml(&source).map_err(|source| CliError::InvalidConfig {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
 pub fn load(path: &Path) -> Result<Config, CliError> {
-    match fs::read_to_string(path) {
-        Ok(source) => Config::from_toml(&source).map_err(|source| CliError::InvalidConfig {
-            path: path.to_path_buf(),
-            source,
-        }),
-        Err(error) if error.kind() == io::ErrorKind::NotFound => Ok(Config::default()),
-        Err(source) => Err(CliError::Io {
-            path: path.to_path_buf(),
-            source,
-        }),
+    match read(path) {
+        Err(CliError::Io { source, .. }) if source.kind() == io::ErrorKind::NotFound => {
+            Ok(Config::default())
+        }
+        result => result,
     }
 }
 
@@ -31,6 +37,15 @@ mod tests {
             load(&dir.path().join("absent.toml")).unwrap(),
             Config::default()
         );
+    }
+
+    #[test]
+    fn reading_a_missing_file_is_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            read(&dir.path().join("absent.toml")),
+            Err(CliError::Io { .. })
+        ));
     }
 
     #[test]

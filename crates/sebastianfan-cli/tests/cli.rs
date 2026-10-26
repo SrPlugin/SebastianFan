@@ -243,3 +243,75 @@ fn status_fails_on_an_invalid_configuration() {
             "poll_interval_ms must be at least",
         ));
 }
+
+#[test]
+fn curve_show_prints_the_default_curve() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(root.path().join("absent.toml"))
+        .args(["curve", "show"])
+        .assert()
+        .success()
+        .stdout(">= 0 °C   quiet\n>= 55 °C  balanced\n>= 75 °C  balanced-performance\n");
+}
+
+#[test]
+fn curve_show_prints_the_configured_curve() {
+    let root = fake_root();
+    let config = root.path().join("config.toml");
+    fs::write(
+        &config,
+        "[[curve]]\nmin_celsius = 40\nprofile = \"quiet\"\n",
+    )
+    .unwrap();
+    sebastianfan(&root)
+        .arg("--config")
+        .arg(&config)
+        .args(["curve", "show"])
+        .assert()
+        .success()
+        .stdout(">= 40 °C  quiet\n");
+}
+
+#[test]
+fn curve_validate_accepts_a_valid_file() {
+    let root = fake_root();
+    let file = root.path().join("candidate.toml");
+    fs::write(&file, "hysteresis_celsius = 2").unwrap();
+    sebastianfan(&root)
+        .args(["curve", "validate"])
+        .arg(&file)
+        .assert()
+        .success()
+        .stdout(predicate::str::ends_with(": ok (3 steps)\n"));
+}
+
+#[test]
+fn curve_validate_rejects_an_unordered_curve() {
+    let root = fake_root();
+    let file = root.path().join("candidate.toml");
+    fs::write(
+        &file,
+        "[[curve]]\nmin_celsius = 60\nprofile = \"balanced\"\n\n\
+         [[curve]]\nmin_celsius = 40\nprofile = \"quiet\"\n",
+    )
+    .unwrap();
+    sebastianfan(&root)
+        .args(["curve", "validate"])
+        .arg(&file)
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("strictly increasing"));
+}
+
+#[test]
+fn curve_validate_fails_for_a_missing_file() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["curve", "validate"])
+        .arg(root.path().join("absent.toml"))
+        .assert()
+        .failure()
+        .stderr(predicate::str::starts_with("error: "));
+}

@@ -35,6 +35,8 @@ pub enum Command {
     Fan(FanCommand),
     #[command(subcommand, about = "Show or change the platform profile")]
     Profile(ProfileCommand),
+    #[command(subcommand, about = "Inspect and validate the temperature curve")]
+    Curve(CurveCommand),
 }
 
 #[derive(Debug, Subcommand)]
@@ -65,4 +67,15 @@ pub enum ProfileCommand {
 fn profile_parser() -> impl TypedValueParser<Value = Profile> {
     PossibleValuesParser::new(Profile::ALL.map(Profile::as_str))
         .try_map(|name| name.parse::<Profile>())
+}
+
+#[derive(Debug, Subcommand)]
+pub enum CurveCommand {
+    #[command(about = "Print the curve from the active configuration")]
+    Show,
+    #[command(about = "Check that a configuration file is valid")]
+    Validate {
+        #[arg(value_name = "FILE")]
+        file: PathBuf,
+    },
 }
