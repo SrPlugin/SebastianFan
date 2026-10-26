@@ -204,6 +204,8 @@ fn status_summarizes_profile_temperature_and_fans() {
             predicate::str::contains("profile")
                 .and(predicate::str::contains("balanced"))
                 .and(predicate::str::contains("43.5 °C (x86_pkg_temp)"))
+                .and(predicate::str::contains("fan control"))
+                .and(predicate::str::contains("cpu auto, gpu auto"))
                 .and(predicate::str::contains("fan acer/fan1"))
                 .and(predicate::str::contains("3307 rpm")),
         );
@@ -233,7 +235,7 @@ fn status_degrades_gracefully_on_unsupported_hardware() {
         .arg("status")
         .assert()
         .success()
-        .stdout(predicate::str::contains("unavailable").count(3));
+        .stdout(predicate::str::contains("unavailable").count(4));
 }
 
 #[test]

@@ -1,11 +1,15 @@
-use sebastianfan_core::{Config, ProfileControl};
-use sebastianfan_sysfs::{find_zone, list_fans, PlatformProfile};
+use sebastianfan_core::{Config, FanControl, ProfileControl};
+use sebastianfan_sysfs::{find_zone, list_fans, NitroSense, PlatformProfile};
 
 use crate::paths::Paths;
 use crate::render::{describe, table};
 
 pub fn show(paths: &Paths, config: &Config) -> String {
-    let mut rows = vec![profile_row(paths), temperature_row(paths, config)];
+    let mut rows = vec![
+        profile_row(paths),
+        temperature_row(paths, config),
+        fan_control_row(paths),
+    ];
     rows.extend(fan_rows(paths));
     table(&rows)
 }
@@ -13,6 +17,11 @@ pub fn show(paths: &Paths, config: &Config) -> String {
 fn profile_row(paths: &Paths) -> Vec<String> {
     let current = PlatformProfile::new(&paths.platform_profile()).current();
     vec!["profile".to_owned(), describe(current)]
+}
+
+fn fan_control_row(paths: &Paths) -> Vec<String> {
+    let setting = NitroSense::new(&paths.nitro_sense()).get();
+    vec!["fan control".to_owned(), describe(setting)]
 }
 
 fn temperature_row(paths: &Paths, config: &Config) -> Vec<String> {
