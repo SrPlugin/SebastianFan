@@ -189,8 +189,11 @@ Profiles change the firmware fan curve and the power limits together, so a
 `fan set` writes the `cpu,gpu` percentages to
 `/sys/devices/platform/acer-wmi/nitro_sense/fan_speed`, the attribute exposed by
 the `linuwu_sense` driver, where `0` means automatic. Manual speeds are limited
-to 20-100 % so a fan cannot be stalled by mistake, and the setting stays in
-place until you set `auto` again or reboot.
+to 20-100 % so a fan cannot be stalled by mistake. The setting stays in place
+until you set `auto` again. While a fan is manual the daemon does not change the
+profile, because the driver resets the fans whenever `quiet` is set. `fan set`
+saves the setting to `/var/lib/sebastianfan/fans` and the daemon reapplies it at
+start, so it survives a reboot.
 
 The stock `acer-wmi` driver of Linux 6.17 only reads fan speeds. Calling the
 firmware's WMI fan methods directly is rejected on the Acer Nitro ANV15-51, so
