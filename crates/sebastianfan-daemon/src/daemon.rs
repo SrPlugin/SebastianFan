@@ -4,25 +4,29 @@ use std::time::{Duration, Instant};
 
 use tracing::info;
 
-use sebastianfan_core::{Config, Governor, HardwareError, Profile, ProfileControl, SensorSource};
+use sebastianfan_core::{
+    Config, FanControl, FanSetting, Governor, HardwareError, Profile, ProfileControl, SensorSource,
+};
 
 const SHUTDOWN_POLL: Duration = Duration::from_millis(100);
 
 #[derive(Debug)]
-pub struct Daemon<S, C> {
+pub struct Daemon<S, C, F> {
     sensor: S,
     control: C,
+    fans: F,
     governor: Governor,
     interval: Duration,
     required: Vec<Profile>,
     applied: Option<Profile>,
 }
 
-impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
-    pub fn new(sensor: S, control: C, config: &Config) -> Self {
+impl<S: SensorSource, C: ProfileControl, F: FanControl> Daemon<S, C, F> {
+    pub fn new(sensor: S, control: C, fans: F, config: &Config) -> Self {
         Self {
             sensor,
             control,
+            fans,
             governor: Governor::new(
                 config.curve.clone(),
                 config.hysteresis_celsius,
@@ -42,6 +46,11 @@ impl<S: SensorSource, C: ProfileControl> Daemon<S, C> {
     pub fn tick(&mut self) -> Result<Profile, HardwareError> {
         let temperature = self.sensor.read()?;
         let profile = self.governor.update(temperature, Instant::now());
+        // The driver resets manual fan speeds when the quiet profile is set,
+        // so leave the profile alone while the user has pinned a fan.
+        if self.fans.get().is_ok_and(FanSetting::is_manual) {
+            return Ok(profile);
+        }
         if self.applied != Some(profile) {
             self.control.set(profile)?;
             info!(%temperature, %profile, "profile changed");
@@ -98,7 +107,7 @@ mod tests {
     use std::collections::VecDeque;
     use std::rc::Rc;
 
-    use sebastianfan_core::{Config, Curve, Step, Temperature};
+    use sebastianfan_core::{Config, Curve, FanSpeed, FanTarget, Step, Temperature};
 
     use super::*;
 
@@ -178,6 +187,22 @@ mod tests {
         }
     }
 
+    struct FixedFans(FanSetting);
+
+    impl FanControl for FixedFans {
+        fn get(&self) -> Result<FanSetting, HardwareError> {
+            Ok(self.0)
+        }
+
+        fn set(&self, _: FanSetting) -> Result<(), HardwareError> {
+            Ok(())
+        }
+    }
+
+    fn manual_fans() -> FixedFans {
+        FixedFans(FanSetting::AUTO.with(FanTarget::Cpu, FanSpeed::Percent(70)))
+    }
+
     fn config() -> Config {
         let curve = Curve::new(vec![
             Step {
@@ -213,6 +238,7 @@ mod tests {
         let mut daemon = Daemon::new(
             ScriptedSensor::new(&[70], &shutdown),
             control.clone(),
+            FixedFans(FanSetting::AUTO),
             &config(),
         );
         assert_eq!(daemon.tick().unwrap(), Profile::Balanced);
@@ -226,6 +252,7 @@ mod tests {
         let mut daemon = Daemon::new(
             ScriptedSensor::new(&[30, 31, 32], &shutdown),
             control.clone(),
+            FixedFans(FanSetting::AUTO),
             &config(),
         );
         for _ in 0..3 {
@@ -235,12 +262,28 @@ mod tests {
     }
 
     #[test]
+    fn tick_leaves_the_profile_alone_while_a_fan_is_manual() {
+        let shutdown = AtomicBool::new(false);
+        let control = RecordingControl::new(Profile::Balanced, &all_profiles());
+        let mut daemon = Daemon::new(
+            ScriptedSensor::new(&[30, 65], &shutdown),
+            control.clone(),
+            manual_fans(),
+            &config(),
+        );
+        daemon.tick().unwrap();
+        daemon.tick().unwrap();
+        assert!(control.writes().is_empty());
+    }
+
+    #[test]
     fn tick_follows_a_rising_temperature() {
         let shutdown = AtomicBool::new(false);
         let control = RecordingControl::new(Profile::Balanced, &all_profiles());
         let mut daemon = Daemon::new(
             ScriptedSensor::new(&[30, 65], &shutdown),
             control.clone(),
+            FixedFans(FanSetting::AUTO),
             &config(),
         );
         daemon.tick().unwrap();
@@ -253,7 +296,12 @@ mod tests {
         let shutdown = AtomicBool::new(false);
         let control = RecordingControl::new(Profile::BalancedPerformance, &all_profiles());
         let sensor = ScriptedSensor::new(&[30, 70], &shutdown);
-        let mut daemon = Daemon::new(sensor, control.clone(), &config());
+        let mut daemon = Daemon::new(
+            sensor,
+            control.clone(),
+            FixedFans(FanSetting::AUTO),
+            &config(),
+        );
         daemon.run(&shutdown).unwrap();
         assert_eq!(
             control.writes(),
@@ -269,7 +317,12 @@ mod tests {
     fn run_restores_the_original_profile_when_the_sensor_fails() {
         let shutdown = AtomicBool::new(false);
         let control = RecordingControl::new(Profile::Balanced, &all_profiles());
-        let mut daemon = Daemon::new(BrokenSensor, control.clone(), &config());
+        let mut daemon = Daemon::new(
+            BrokenSensor,
+            control.clone(),
+            FixedFans(FanSetting::AUTO),
+            &config(),
+        );
         assert!(matches!(
             daemon.run(&shutdown),
             Err(HardwareError::NotFound(_))
@@ -281,7 +334,12 @@ mod tests {
     fn run_refuses_a_curve_the_machine_cannot_apply() {
         let shutdown = AtomicBool::new(false);
         let control = RecordingControl::new(Profile::Quiet, &[Profile::Quiet]);
-        let mut daemon = Daemon::new(BrokenSensor, control.clone(), &config());
+        let mut daemon = Daemon::new(
+            BrokenSensor,
+            control.clone(),
+            FixedFans(FanSetting::AUTO),
+            &config(),
+        );
         let result = daemon.run(&shutdown);
         assert!(matches!(
             result,
@@ -294,7 +352,12 @@ mod tests {
     fn run_returns_immediately_when_shutdown_is_already_requested() {
         let shutdown = AtomicBool::new(true);
         let control = RecordingControl::new(Profile::Balanced, &all_profiles());
-        let mut daemon = Daemon::new(BrokenSensor, control.clone(), &config());
+        let mut daemon = Daemon::new(
+            BrokenSensor,
+            control.clone(),
+            FixedFans(FanSetting::AUTO),
+            &config(),
+        );
         daemon.run(&shutdown).unwrap();
         assert_eq!(control.writes(), [Profile::Balanced]);
     }
