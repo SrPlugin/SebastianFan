@@ -96,6 +96,21 @@ impl fmt::Display for FanSetting {
     }
 }
 
+impl FromStr for FanSetting {
+    type Err = ConfigError;
+
+    /// Parses the `cpu,gpu` form, e.g. `70%,auto`.
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let (cpu, gpu) = value
+            .split_once(',')
+            .ok_or_else(|| ConfigError::InvalidFanSpeed(value.to_owned()))?;
+        Ok(Self {
+            cpu: cpu.parse()?,
+            gpu: gpu.parse()?,
+        })
+    }
+}
+
 pub trait FanControl {
     fn get(&self) -> Result<FanSetting, HardwareError>;
     fn set(&self, setting: FanSetting) -> Result<(), HardwareError>;
@@ -144,6 +159,15 @@ mod tests {
             message,
             "invalid fan speed \"5\": use auto or a percentage from 20 to 100"
         );
+    }
+
+    #[test]
+    fn parses_a_setting_from_the_cpu_gpu_form() {
+        let setting: FanSetting = "70%,auto".parse().unwrap();
+        assert_eq!(setting.cpu, FanSpeed::Percent(70));
+        assert_eq!(setting.gpu, FanSpeed::Auto);
+        assert!("70".parse::<FanSetting>().is_err());
+        assert!("70,5".parse::<FanSetting>().is_err());
     }
 
     #[test]
