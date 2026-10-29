@@ -4,6 +4,7 @@ use sebastianfan_sysfs::{list_fans, Fan, NitroSense};
 use crate::error::CliError;
 use crate::paths::Paths;
 use crate::render::{describe, table};
+use crate::store;
 
 pub fn list(paths: &Paths) -> Result<String, CliError> {
     let rows: Vec<Vec<String>> = list_fans(&paths.hwmon())?
@@ -48,5 +49,6 @@ pub fn set(paths: &Paths, target: FanTarget, speed: FanSpeed) -> Result<String, 
     let control = NitroSense::new(&paths.nitro_sense());
     let updated = control.get()?.with(target, speed);
     control.set(updated)?;
+    store::write_fans(&paths.fan_state(), updated)?;
     Ok(updated.to_string())
 }

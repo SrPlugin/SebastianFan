@@ -713,3 +713,29 @@ fn battery_limit_fails_when_the_driver_is_not_loaded() {
         .failure()
         .stderr(predicate::str::starts_with("error: "));
 }
+
+#[test]
+fn fan_set_is_saved_for_the_next_boot() {
+    let root = fake_root();
+    sebastianfan(&root)
+        .args(["fan", "set", "cpu", "70"])
+        .assert()
+        .success();
+    assert_eq!(fs::read_to_string(fan_speed_file(&root)).unwrap(), "70,0");
+    let saved = root.path().join("var/lib/sebastianfan/fans");
+    assert_eq!(fs::read_to_string(saved).unwrap(), "70%,auto\n");
+}
+
+#[test]
+fn daemon_run_restores_the_saved_fan_setting_after_a_reboot() {
+    let root = fake_root();
+    write(root.path(), "var/lib/sebastianfan/fans", "70%,45%\n");
+    let config = root.path().join("config.toml");
+    fs::write(&config, "poll_interval_ms = 100").unwrap();
+    let child = spawn_daemon(&root, &config, &[]);
+    wait_until(|| fs::read_to_string(fan_speed_file(&root)).is_ok_and(|value| value == "70,45"));
+    terminate(&child);
+    let output = child.wait_with_output().unwrap();
+    assert!(output.status.success());
+    assert_eq!(fs::read_to_string(profile_file(&root)).unwrap(), "balanced");
+}

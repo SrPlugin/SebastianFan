@@ -2,7 +2,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use sebastianfan_core::Config;
+use sebastianfan_core::{Config, FanSetting};
 
 use crate::error::CliError;
 
@@ -26,9 +26,32 @@ pub fn load(path: &Path) -> Result<Config, CliError> {
     }
 }
 
+pub fn read_fans(path: &Path) -> Result<Option<FanSetting>, CliError> {
+    match fs::read_to_string(path) {
+        Ok(text) => Ok(Some(text.trim().parse()?)),
+        Err(source) if source.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(source) => Err(CliError::Io {
+            path: path.to_path_buf(),
+            source,
+        }),
+    }
+}
+
+pub fn write_fans(path: &Path, setting: FanSetting) -> Result<(), CliError> {
+    let io_error = |source| CliError::Io {
+        path: path.to_path_buf(),
+        source,
+    };
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(io_error)?;
+    }
+    fs::write(path, format!("{},{}\n", setting.cpu, setting.gpu)).map_err(io_error)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use sebastianfan_core::FanSpeed;
 
     #[test]
     fn a_missing_file_yields_the_default_configuration() {
@@ -70,5 +93,23 @@ mod tests {
     fn unreadable_paths_are_io_errors() {
         let dir = tempfile::tempdir().unwrap();
         assert!(matches!(load(dir.path()), Err(CliError::Io { .. })));
+    }
+
+    #[test]
+    fn fan_settings_survive_a_write_and_read() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("var/lib/sebastianfan/fans");
+        let setting = FanSetting {
+            cpu: FanSpeed::Percent(70),
+            gpu: FanSpeed::Auto,
+        };
+        write_fans(&path, setting).unwrap();
+        assert_eq!(read_fans(&path).unwrap(), Some(setting));
+    }
+
+    #[test]
+    fn no_saved_fan_setting_is_not_an_error() {
+        let dir = tempfile::tempdir().unwrap();
+        assert_eq!(read_fans(&dir.path().join("absent")).unwrap(), None);
     }
 }

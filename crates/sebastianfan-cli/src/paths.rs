@@ -34,6 +34,10 @@ impl Paths {
         self.under(POWER_SUPPLY_DIR)
     }
 
+    pub fn fan_state(&self) -> PathBuf {
+        self.under("/var/lib/sebastianfan/fans")
+    }
+
     pub fn systemd_units(&self) -> PathBuf {
         self.under("/etc/systemd/system")
     }
